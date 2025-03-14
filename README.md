@@ -94,6 +94,7 @@ Run this command to automatically add the hook script to all existing VZDump bac
 ```bash
 awk 'BEGIN{job=0;has_script=0}/^vzdump:/{if(job&&!has_script)print"        script /usr/local/bin/vzdump-hook-script.py";job=1;has_script=0;print;next}/script \/usr\/local\/bin\/vzdump-hook-script.py/{has_script=1;print;next}/^[a-zA-Z]/{if(job&&$0!~/^[[:space:]]/) {if(!has_script)print"        script /usr/local/bin/vzdump-hook-script.py";job=0;has_script=0}print;next}{print}END{if(job&&!has_script)print"        script /usr/local/bin/vzdump-hook-script.py"}' /etc/pve/jobs.cfg > /tmp/jobs.cfg.new && sudo cp /tmp/jobs.cfg.new /etc/pve/jobs.cfg
 ```
+The idea behind is to add to file /etc/pve/jobs.cfg a line with "script /usr/local/bin/vzdump-hook-script.py" under each jobs
 
 ### 7. Verify installation
 
@@ -103,7 +104,7 @@ Test the script with:
 /usr/local/bin/vzdump-hook-script.py job-init
 ```
 
-You should see a new check created in your Healthchecks.io dashboard.
+You should see a new check created in your Healthchecks.io dashboard (or self hosted).
 
 ## Cluster Installation
 
@@ -172,11 +173,6 @@ If you encounter issues:
 
 Author: Cédric MARCOUX  
 Localisation: Aywaille, Belgium  
-Version: 1.0.0
-
-Release Notes:
-- **1.0.0 (2025-03-12)**:
-  - Initial release
 
 ## License
 

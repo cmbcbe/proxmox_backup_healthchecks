@@ -7,9 +7,11 @@ and report backup status to Healthchecks.io or self-hosted
 
 Author: Cédric MARCOUX
 Localisation : Aywaille, Belgium
-Version: 1.0.0
+Version: 1.0.2
 
 Release Notes:
+- **1.0.2 (2025-03-14)**:
+  - tag sorting
 - **1.0.0 (2025-03-12)**:
   - Initial release
 
@@ -21,8 +23,8 @@ Installation:
    - Add to /etc/pve/jobs.cfg: script /usr/local/bin/vzdump-hook-script.py
 
 Environment variables can be configured in /etc/pve/healthchecks/variables.env:
-    HC_BASE_DOMAIN=https://healthchecks.example.com or <self-hosted url>
-    HC_PING_DOMAIN=https://healthchecks.example.com/ping or <self-hosted url>/ping
+    HC_BASE_DOMAIN=https://healthchecks.mydomain.com or <self-hosted url>
+    HC_PING_DOMAIN=https://healthchecks.mydomain.com/ping or <self-hosted url>/ping
     HC_RW_API_KEY=<your project read-write api key>
     HC_PING_KEY=<your project ping key>
 
@@ -46,8 +48,8 @@ from pathlib import Path
 from typing import Optional, Dict, List, Tuple, Any, Union
 
 # Default configuration
-DEFAULT_HC_BASE_DOMAIN = "https://healthchecks.cmbc.be"
-DEFAULT_HC_PING_DOMAIN = "https://healthchecks.cmbc.be/ping"
+DEFAULT_HC_BASE_DOMAIN = "https://healthchecks.mydomain.com"
+DEFAULT_HC_PING_DOMAIN = "https://healthchecks.mydomain.com/ping"
 DEFAULT_HC_RW_API_KEY = "eJy4I0V41OJ7jM1tQy5gjtBgyJ9mz1Kd"
 DEFAULT_HC_PING_KEY = "oiB2qNQV2uGsYSxQAo3rxA"
 DEFAULT_ERROR_CODE = 666

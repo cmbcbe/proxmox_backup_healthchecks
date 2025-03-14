@@ -289,7 +289,7 @@ def add_tag(key: str, value: str) -> Optional[str]:
         return None
     
     if not value:
-        warn("Value Validation", "Empty value")
+        #warn("Value Validation", "Empty value")
         return None
     
     # Check that the value contains useful characters

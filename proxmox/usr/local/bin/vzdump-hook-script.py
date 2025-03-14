@@ -289,7 +289,7 @@ def add_tag(key: str, value: str) -> Optional[str]:
         return None
     
     if not value:
-        #warn("Value Validation", "Empty value")
+        warn("Value Validation", "Empty value")
         return None
     
     # Check that the value contains useful characters
@@ -480,22 +480,26 @@ def main() -> None:
     check_jq_installed()
     
     if PHASE == "job-init":
-        # Créer l'endpoint Healthchecks pour l'hôte
+        # Create the Healthchecks endpoint for the host
         tags = ""
         
-        # Ajouter des tags
-        for tag_data in [
-            add_tag("cluster", CLUSTER),
-            add_tag("node", os.environ.get("HOSTNAME", "")),
-            add_tag("storage", STORAGE),
-            add_tag_from_file("/etc/machine-id"),
-            add_tag_from_cmd("arch", "uname", "--machine"),
-            add_tag_from_cmd("kernel", "uname", "--kernel-release")
-        ]:
-            if tag_data:
-                tags += tag_data
-        
-        # Récupérer la description du nœud
+        # For host, add cluster and kernel tags
+        cluster_tag = add_tag("cluster", CLUSTER)
+        if cluster_tag:
+            tags += cluster_tag
+            
+        # Add kernel tag using the uname command
+        try:
+            kernel_cmd = "uname --kernel-release"
+            kernel_result = subprocess.run(kernel_cmd, shell=True, capture_output=True, text=True)
+            kernel_version = kernel_result.stdout.strip()
+            kernel_tag = add_tag("kernel", kernel_version)
+            if kernel_tag:
+                tags += kernel_tag
+        except Exception as e:
+            warn("Kernel tag", str(e))
+
+        # Get node description
         try:
             cmd = "grep '^#' /etc/pve/local/config | sed 's/^#//'"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
@@ -513,30 +517,27 @@ def main() -> None:
         )
     
     elif PHASE == "job-start":
-        # Envoyer un ping de démarrage à l'endpoint de l'hôte
+        # Send a start ping to the host endpoint
         info(f"{PHASE} -- Ping Host Start")
         hc_ping(HC_HOST_SLUG_PREFIX, "start")
     
     elif PHASE == "backup-start":
-        # Créer et démarrer l'endpoint Healthchecks pour la VM/LXC
-        # et envoyer un ping de journal à l'endpoint de l'hôte
+        # Create and start the Healthchecks endpoint for the VM/container
+        # and send a log ping to the host endpoint
         tags = ""
         
-        # Ajouter des tags
-        for tag_data in [
-            add_tag("cluster", CLUSTER),
-            add_tag_from_cmd("node", "hostname"),
-            add_tag("storage", STORAGE),
-            add_tag("mode", MODE),
-            add_tag("vmid", VMID),
-            add_tag("hostname", os.environ.get("HOSTNAME", "")),
-            add_tag("type", os.environ.get("HOSTTYPE", "")),
-            add_tag("vmtype", VMTYPE)
+        # Add only cluster, node, storage, and vmtype tags for VM/container
+        for tag_name, tag_value in [
+            ("cluster", CLUSTER),
+            ("node", NODE),
+            ("storage", STORAGE),
+            ("vmtype", VMTYPE)
         ]:
-            if tag_data:
-                tags += tag_data
+            tag = add_tag(tag_name, tag_value)
+            if tag:
+                tags += tag
         
-        # Récupérer la description de la VM/LXC
+        # Get VM/container description
         description = ""
         if VMTYPE == "qemu":
             try:
@@ -555,7 +556,7 @@ def main() -> None:
         
         info(f"{PHASE} -- Create {os.environ.get('HOSTNAME', 'unknown')} Endpoint")
         
-        # Créer l'endpoint pour la VM/LXC
+        # Create endpoint for VM/container
         domain_cmd = "hostname --domain"
         domain_result = subprocess.run(domain_cmd, shell=True, capture_output=True, text=True)
         domain = domain_result.stdout.strip()
@@ -575,7 +576,7 @@ def main() -> None:
         hc_ping(HC_HOST_SLUG_PREFIX, "log", data=f"{PHASE}: {HC_VM_SLUG_PREFIX}")
     
     elif PHASE in ["pre-stop", "pre-restart", "post-restart"]:
-        # Envoyer un ping de journal aux endpoints de la VM/LXC et de l'hôte
+        # Send a log ping to VM/container and host endpoints
         info(f"{PHASE} -- Ping {VMTYPE} Log")
         hc_ping(HC_VM_SLUG_PREFIX, "log", data=f"{PHASE}: {HC_VM_SLUG_PREFIX}")
         
@@ -583,8 +584,8 @@ def main() -> None:
         hc_ping(HC_HOST_SLUG_PREFIX, "log", data=f"{PHASE}: {HC_VM_SLUG_PREFIX}")
     
     elif PHASE == "backup-end":
-        # Envoyer un ping de succès à l'endpoint de la VM/LXC
-        # et un ping de journal à l'endpoint de l'hôte
+        # Send a success ping to VM/container endpoint
+        # and a log ping to host endpoint
         info(f"{PHASE} -- Ping {VMTYPE} Success")
         hc_ping(HC_VM_SLUG_PREFIX, data=f"{PHASE}: {HC_VM_SLUG_PREFIX}")
         
@@ -592,8 +593,8 @@ def main() -> None:
         hc_ping(HC_HOST_SLUG_PREFIX, "log", data=f"{PHASE}: {HC_VM_SLUG_PREFIX}")
     
     elif PHASE == "backup-abort":
-        # Envoyer un ping d'échec à l'endpoint de la VM/LXC
-        # et un ping de journal à l'endpoint de l'hôte
+        # Send a fail ping to VM/container endpoint
+        # and a log ping to host endpoint
         info(f"{PHASE} -- Ping {VMTYPE} fail")
         hc_ping(HC_VM_SLUG_PREFIX, "fail", data=f"{PHASE}: {HC_VM_SLUG_PREFIX}")
         
@@ -606,13 +607,13 @@ def main() -> None:
         print(f"{TASK_ID} - {VMID} - Backup Abort - {url}")
     
     elif PHASE == "log-end":
-        # Envoyer un ping de journal à l'endpoint de la VM/LXC
-        # avec le contenu du fichier journal
+        # Send a log ping to VM/container endpoint
+        # with log file content
         info(f"LOGFILE: {LOGFILE}")
         info(f"{PHASE} -- Ping {VMTYPE} Log")
         
         try:
-            # Filtrer le journal pour ne pas inclure les lignes MESG et OKhttp
+            # Filter log to exclude MESG and OKhttp lines
             cmd = f"grep -v 'MESG' {LOGFILE} | grep -v 'OKhttp'"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             backup_log = result.stdout
@@ -622,20 +623,20 @@ def main() -> None:
             error("Read Log File", str(e))
     
     elif PHASE == "job-end":
-        # Envoyer un ping de succès ou d'échec à l'endpoint de l'hôte
+        # Send a success or fail ping to host endpoint
         if ERRLOG.exists():
             with open(ERRLOG, "r") as f:
                 job_log = f.read()
             
             info(f"{PHASE} -- Ping Host Fail")
             hc_ping(HC_HOST_SLUG_PREFIX, "fail", data=job_log)
-            ERRLOG.unlink()  # Supprimer le fichier d'erreur
+            ERRLOG.unlink()  # Delete error log file
         else:
             info(f"{PHASE} -- Ping Host Success")
             hc_ping(HC_HOST_SLUG_PREFIX, data=TASK_ID)
     
     elif PHASE == "job-abort":
-        # Envoyer un ping d'échec à l'endpoint de l'hôte
+        # Send a fail ping to host endpoint
         info(f"{PHASE} -- Ping Host Fail")
         with open(ERRLOG, "a") as f:
             f.write(f"{TASK_ID} - Job Abort\n")
@@ -646,7 +647,7 @@ def main() -> None:
         hc_ping(HC_HOST_SLUG_PREFIX, "fail", data=job_log)
     
     else:
-        # Phase inconnue, envoyer un ping d'échec à l'endpoint de l'hôte
+        # Unknown phase, send a fail ping to host endpoint
         info(f"{PHASE} -- Ping Host Fail")
         hc_ping(HC_HOST_SLUG_PREFIX, "fail", data=f"UNKNOWN: {PHASE}")
         warn("Unknown Phase", PHASE)
